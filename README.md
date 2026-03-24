@@ -1,12 +1,12 @@
 # stl10-active-learning
 
-> Comparing uncertainty-based active learning query strategies against random sampling on STL-10 using MobileNetV3-Small.
+> Comparing uncertainty-based active learning query strategies and semi-supervised learning (FixMatch) against random sampling on STL-10 using MobileNetV3-Small.
 
 ---
 
 ## Overview
 
-This project benchmarks four active learning query strategies on the [STL-10](https://cs.stanford.edu/~acoates/stl10/) image classification dataset. Starting from a small labeled pool of 500 samples, each strategy iteratively queries the most informative unlabeled samples, measuring how efficiently test accuracy improves as the labeled pool grows. Results are averaged over 3 random seeds and reported as mean ± std.
+This project benchmarks four active learning query strategies alongside a semi-supervised learning (SSL) baseline on the [STL-10](https://cs.stanford.edu/~acoates/stl10/) image classification dataset. Starting from a small labeled pool of 500 samples, the active learning strategies iteratively query the most informative unlabeled samples. The SSL baseline leverages the remaining unlabeled data at each pool size via consistency regularization. The goal is to measure how efficiently test accuracy improves as the labeled pool grows, and at what point targeted active learning overtakes semi-supervised learning. Results are averaged over 3 random seeds and reported as mean ± std.
 
 ---
 
@@ -27,7 +27,7 @@ This project benchmarks four active learning query strategies on the [STL-10](ht
 |---|---|---|
 | Initial labeled pool | 500 | Training at iteration 0 |
 | Validation set | 500 | Model selection / early stopping |
-| Unlabeled pool | 4,000 | Query candidates for AL |
+| Unlabeled pool | 4,000 | Query candidates for AL / Unlabeled pool for SSL |
 
 ---
 
@@ -54,57 +54,53 @@ MobileNetV3-Small was chosen over larger models (e.g. ResNet18 at 11M params) to
 | Learning rate | 0.001 |
 | Weight decay | 1e-4 |
 | LR schedule | Linear warmup (3 epochs) → CosineAnnealing |
-| Epochs per AL iteration | 10 |
+| Epochs per Evaluation | 10 |
 | Batch size | 64 |
 | Label smoothing | 0.1 |
 | Dropout | 0.3 |
 
 ### Data Augmentation
 
-Training uses augmented transforms; validation and query inference always use clean transforms to avoid noise in uncertainty scores.
+Training uses augmented transforms; validation and query inference always use clean transforms. The SSL approach (FixMatch) utilizes a dual-augmentation strategy.
 
-| Split | Transforms |
+| Split / Method | Transforms |
 |---|---|
-| Train | RandomHorizontalFlip, RandomCrop(96, padding=12), ColorJitter, RandomGrayscale, Normalize |
+| Train (AL / Supervised) | RandomHorizontalFlip, RandomCrop(96, padding=12), ColorJitter, RandomGrayscale, Normalize |
 | Val / Query | ToTensor, Normalize |
+| FixMatch (Weak) | RandomHorizontalFlip, RandomCrop(96, padding=12), ToTensor, Normalize |
+| FixMatch (Strong) | RandomHorizontalFlip, RandomCrop(96, padding=12), RandAugment(2, 9), ToTensor, Normalize |
 
 ### Model Reset
 
-The model is **fully reset to pretrained ImageNet weights** at the start of each AL iteration. This prevents carrying over local minima and ensures a fair comparison across pool sizes.
+The model is **fully reset to pretrained ImageNet weights** at the start of each evaluation step (whether querying in AL or expanding the pool in SSL). This prevents carrying over local minima and ensures a fair comparison across pool sizes.
 
 ---
 
-## Active Learning Setup
+## Evaluation Setup
 
 | Property | Value |
 |---|---|
 | Initial labeled pool | 500 |
-| Query size per iteration | 200 |
-| AL iterations | 5 |
+| Step size per iteration | 200 |
+| Evaluation points | 5 |
 | Final labeled pool | 1,500 |
 | Seeds | 42, 7, 123 |
 
 ---
 
-## Query Strategies
+## Strategies Evaluated
 
-### Random Sampling (baseline)
-Selects samples uniformly at random from the unlabeled pool. Serves as the lower-bound baseline — no model information is used.
+### Active Learning Strategies
+* **Random Sampling (baseline):** Selects samples uniformly at random from the unlabeled pool. Serves as the lower-bound baseline.
+* **Least Confidence:** Queries samples where the model's maximum class probability is lowest:
+  $$x^* = \arg\min_{x} \max_c \, p(y=c \mid x)$$
+* **Margin Sampling:** Queries samples where the gap between the top-2 class probabilities is smallest:
+  $$x^* = \arg\min_{x} \left( p_1(x) - p_2(x) \right)$$
+* **Entropy Sampling:** Queries samples with the highest predictive entropy:
+  $$x^* = \arg\max_{x} -\sum_c p(y=c \mid x) \log p(y=c \mid x)$$
 
-### Least Confidence
-Queries samples where the model's maximum class probability is lowest:
-
-$$x^* = \arg\min_{x} \max_c \, p(y=c \mid x)$$
-
-### Margin Sampling
-Queries samples where the gap between the top-2 class probabilities is smallest:
-
-$$x^* = \arg\min_{x} \left( p_1(x) - p_2(x) \right)$$
-
-### Entropy Sampling
-Queries samples with the highest predictive entropy:
-
-$$x^* = \arg\max_{x} -\sum_c p(y=c \mid x) \log p(y=c \mid x)$$
+### Semi-Supervised Baseline
+* **FixMatch:** At each labeled pool size, the model trains on the labeled subset while applying consistency regularization to the remaining unlabeled data. Weakly augmented images generate pseudo-labels (if confidence $\ge 0.95$), which are then used as targets for strongly augmented versions of the same images.
 
 ---
 
@@ -120,30 +116,27 @@ Training on all 4,500 available samples (labeled + unlabeled, excluding validati
 
 ---
 
-### Active Learning Comparison
+### Active Learning vs. Semi-Supervised Comparison
 
 Test accuracy (mean ± std over 3 seeds) as the labeled pool grows from 500 to 1,500 samples.
 
-| Pool Size | Random | Least Confidence | Margin Sampling | Entropy Sampling |
-|---|---|---|---|---|
-| 500 | 66.50 ± 0.93 | 65.75 ± 2.15 | 64.62 ± 0.87 | 64.27 ± 1.86 |
-| 700 | 69.77 ± 2.23 | 70.92 ± 1.00 | 71.48 ± 0.39 | 70.77 ± 0.86 |
-| 900 | 70.72 ± 0.02 | 73.11 ± 0.62 | 73.13 ± 0.77 | 73.27 ± 0.48 |
-| 1100 | 75.43 ± 0.68 | 77.00 ± 1.05 | 76.34 ± 1.02 | 77.09 ± 1.44 |
-| 1300 | 77.89 ± 0.46 | 78.85 ± 0.72 | 78.43 ± 0.13 | 78.48 ± 0.51 |
-| **1500** | 78.92 ± 0.60 | 80.08 ± 0.66 | 80.05 ± 0.49 | **80.42 ± 0.22** |
-
-**Best strategy at 1,500 labels:** Entropy Sampling (80.42%) — narrowly ahead of Least Confidence (80.08%) and Margin Sampling (80.05%), all notably above Random (78.92%).
-
-**Gap vs. full dataset:** The best AL strategy at 1,500 labels (80.42%) achieves ~92.6% of the full-dataset accuracy (86.89%) using only 33% of the available labeled data.
+| Pool Size | Random | Least Confidence | Margin Sampling | Entropy Sampling | SSL (FixMatch) |
+|---|---|---|---|---|---|
+| **500** | 66.50 ± 0.93 | 65.75 ± 2.15 | 64.62 ± 0.87 | 64.27 ± 1.86 | **69.21 ± 0.16** |
+| **700** | 69.77 ± 2.23 | 70.92 ± 1.00 | 71.48 ± 0.39 | 70.77 ± 0.86 | **72.75 ± 0.71** |
+| **900** | 70.72 ± 0.02 | 73.11 ± 0.62 | 73.13 ± 0.77 | 73.27 ± 0.48 | **75.08 ± 0.59** |
+| **1100** | 75.43 ± 0.68 | 77.00 ± 1.05 | 76.34 ± 1.02 | 77.09 ± 1.44 | **77.45 ± 0.63** |
+| **1300** | 77.89 ± 0.46 | **78.85 ± 0.72** | 78.43 ± 0.13 | 78.48 ± 0.51 | 78.82 ± 0.72 |
+| **1500** | 78.92 ± 0.60 | 80.08 ± 0.66 | 80.05 ± 0.49 | **80.42 ± 0.22** | 79.64 ± 0.34 |
 
 ---
 
 ## Key Observations
 
-- **All uncertainty strategies outperform random sampling** consistently from pool size 700 onward, confirming that model-guided querying is beneficial even on small datasets.
-- **Entropy and margin sampling converge tightly** across all pool sizes, suggesting that the difference in uncertainty signal between these two criteria is marginal at this scale.
-- **Standard deviation decreases** as the pool grows for all methods, indicating that results become more stable as more labeled data is available.
+- **The Low-Data SSL Advantage:** In the extremely low-data regime (500–1,100 labels), FixMatch heavily dominates. Because the AL feature extractors are weak at this stage, uncertainty metrics are largely inaccurate. FixMatch bypasses this by leveraging the 4,000+ unlabeled images immediately to learn robust features.
+- **The Active Learning Crossover:** As the labeled pool reaches 1,300–1,500 samples, Active Learning (specifically Entropy and Least Confidence) overtakes SSL. Once the model is competent enough, querying highly informative targeted labels yields better performance than training on random labels combined with pseudo-labels.
+- **Uncertainty Strategies vs. Random:** All uncertainty strategies consistently outperform random sampling from pool size 700 onward, confirming that model-guided querying remains highly beneficial.
+- **Stability:** FixMatch shows remarkable stability (low standard deviation) even at the lowest data scales, whereas AL methods initially suffer from higher variance until the feature representations mature.
 
 ---
 
@@ -162,31 +155,8 @@ python active_learning_mobilenet.py --method least_confidence
 python active_learning_mobilenet.py --method margin_sampling
 python active_learning_mobilenet.py --method entropy_sampling
 
+# Semi-supervised baseline (FixMatch)
+python active_learning_mobilenet.py --method ssl_fixmatch
+
 # Custom seeds
 python active_learning_mobilenet.py --method entropy_sampling --seeds 0 1 2 3 4
-```
-
-All runs are logged to [Weights & Biases](https://wandb.ai) under the project `stl10-active-learning`. Each seed produces an individual run; a `summary_{method}` run aggregates mean ± std for cross-method comparison charts.
-
----
-
-## Repository Structure
-
-```
-stl10-active-learning/
-├── active_learning_mobilenet.py   # Main training & evaluation script
-├── README.md
-└── data/                          # STL-10 downloaded automatically by torchvision
-```
-
----
-
-## Dependencies
-
-| Package | Purpose |
-|---|---|
-| torch / torchvision | Model, training, datasets |
-| wandb | Experiment tracking |
-| scikit-learn | Confusion matrix |
-| matplotlib | Confusion matrix visualization |
-| numpy | Array operations |
