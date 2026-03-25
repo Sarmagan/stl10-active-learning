@@ -124,12 +124,12 @@ Test accuracy (mean ± std over 3 seeds) as the labeled pool grows from 500 to 1
 
 | Pool Size | Random | Least Confidence | Margin Sampling | Entropy Sampling | Core-Set | BADGE | SSL (FixMatch) |
 |---|---|---|---|---|---|---|---|
-| **500** | 66.50 ± 0.93 | 65.75 ± 2.15 | 64.62 ± 0.87 | 64.27 ± 1.86 | 63.75 ± 2.53 | 64.95 ± 1.83 | **69.21 ± 0.16** |
-| **700** | 69.77 ± 2.23 | 70.92 ± 1.00 | 71.48 ± 0.39 | 70.77 ± 0.86 | 70.26 ± 0.99 | 70.99 ± 1.74 | **72.75 ± 0.71** |
-| **900** | 70.72 ± 0.02 | 73.11 ± 0.62 | 73.13 ± 0.77 | 73.27 ± 0.48 | 71.90 ± 1.35 | 73.46 ± 0.86 | **75.08 ± 0.59** |
-| **1100** | 75.43 ± 0.68 | 77.00 ± 1.05 | 76.34 ± 1.02 | 77.09 ± 1.44 | 75.19 ± 1.01 | 76.78 ± 0.27 | **77.45 ± 0.63** |
-| **1300** | 77.89 ± 0.46 | **78.85 ± 0.72** | 78.43 ± 0.13 | 78.48 ± 0.51 | 77.50 ± 0.46 | 78.20 ± 0.30 | 78.82 ± 0.72 |
-| **1500** | 78.92 ± 0.60 | 80.08 ± 0.66 | 80.05 ± 0.49 | **80.42 ± 0.22** | 79.09 ± 0.19 | 79.91 ± 0.34 | 79.64 ± 0.34 |
+| **500** | 66.50 ± 0.93 | 65.75 ± 2.15 | 64.62 ± 0.87 | 64.27 ± 1.86 | 63.75 ± 2.53 | 64.91 ± 1.41 | **69.21 ± 0.16** |
+| **700** | 69.77 ± 2.23 | 70.92 ± 1.00 | 71.48 ± 0.39 | 70.77 ± 0.86 | 70.26 ± 0.99 | 70.05 ± 1.60 | **72.75 ± 0.71** |
+| **900** | 70.72 ± 0.02 | 73.11 ± 0.62 | 73.13 ± 0.77 | 73.27 ± 0.48 | 71.90 ± 1.35 | 72.96 ± 0.58 | **75.08 ± 0.59** |
+| **1100** | 75.43 ± 0.68 | 77.00 ± 1.05 | 76.34 ± 1.02 | 77.09 ± 1.44 | 75.19 ± 1.01 | 76.84 ± 0.60 | **77.45 ± 0.63** |
+| **1300** | 77.89 ± 0.46 | **78.85 ± 0.72** | 78.43 ± 0.13 | 78.48 ± 0.51 | 77.50 ± 0.46 | 78.53 ± 0.33 | 78.82 ± 0.72 |
+| **1500** | 78.92 ± 0.60 | 80.08 ± 0.66 | 80.05 ± 0.49 | **80.42 ± 0.22** | 79.09 ± 0.19 | 79.65 ± 0.31 | 79.64 ± 0.34 |
 
 ---
 
@@ -138,7 +138,7 @@ Test accuracy (mean ± std over 3 seeds) as the labeled pool grows from 500 to 1
 - **The Low-Data SSL Advantage:** In the extremely low-data regime (500–1,100 labels), FixMatch remains the strongest method. Because the classifier is still immature early on, direct use of the unlabeled pool provides a larger benefit than label-query optimization alone.
 - **Uncertainty Still Leads Among AL Methods:** Entropy, Least Confidence, and Margin remain the strongest active learning strategies overall, especially once the labeled pool reaches 900+ samples.
 - **Core-Set Improves with Task-Aligned Features:** Core-Set trails the best uncertainty methods and only narrowly competes with random sampling.
-- **BADGE Is a Stronger Diversity Baseline:** BADGE consistently outperforms Core-Set and is competitive with the uncertainty methods, especially in the mid-data regime, confirming that mixing uncertainty with diversity is more effective than pure coverage alone.
+- **BADGE Is a Stronger Diversity Baseline:** BADGE consistently outperforms Core-Set and stays close to the strongest uncertainty methods through the mid-to-late data regime, confirming that mixing uncertainty with diversity is more effective than pure coverage alone.
 - **The Active Learning Crossover:** By 1,300–1,500 labels, the best active learning methods overtake SSL. Entropy remains the best overall method at 1,500 labels, with BADGE and the other uncertainty methods also closing most of the SSL gap earlier.
 
 ---

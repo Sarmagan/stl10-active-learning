@@ -104,6 +104,20 @@ def get_new_model(pretrained_state: dict = None):
     return model
 
 
+def get_penultimate_features_and_logits(model, inputs):
+    """Return the features seen by the final linear layer plus its logits."""
+    features = model.features(inputs)
+    features = model.avgpool(features)
+    features = torch.flatten(features, 1)
+
+    penultimate = model.classifier[0](features)
+    penultimate = model.classifier[1](penultimate)
+    penultimate = model.classifier[2](penultimate)
+    penultimate = model.classifier[3][0](penultimate)
+    logits = model.classifier[3][1](penultimate)
+    return penultimate, logits
+
+
 def get_feature_probabilities(model, indices, query_dataset):
     """Collect penultimate features and probabilities on the clean query transform."""
     model.eval()
@@ -117,10 +131,7 @@ def get_feature_probabilities(model, indices, query_dataset):
     with torch.no_grad():
         for inputs, _ in loader:
             inputs = inputs.to(DEVICE)
-            features = model.features(inputs)
-            features = model.avgpool(features)
-            features = torch.flatten(features, 1)
-            logits = model.classifier(features)
+            features, logits = get_penultimate_features_and_logits(model, inputs)
             probs = torch.softmax(logits, dim=1)
 
             all_features.append(features.cpu())
@@ -140,7 +151,10 @@ def get_badge_embeddings(model, unlabeled_indices, query_dataset):
     features, probs = get_feature_probabilities(model, unlabeled_indices, query_dataset)
     preds = probs.argmax(dim=1)
     one_hot = F.one_hot(preds, num_classes=NUM_CLASSES).float()
-    grad_embeddings = features.unsqueeze(1) * (one_hot - probs).unsqueeze(2)
+    class_residuals = one_hot - probs
+    weight_grads = features.unsqueeze(1) * class_residuals.unsqueeze(2)
+    bias_grads = class_residuals.unsqueeze(2)
+    grad_embeddings = torch.cat([weight_grads, bias_grads], dim=2)
     return grad_embeddings.reshape(grad_embeddings.size(0), -1)
 
 
